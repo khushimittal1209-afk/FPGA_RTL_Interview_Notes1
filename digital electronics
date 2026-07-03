@@ -1,0 +1,734 @@
+# Digital Circuits and Design — Complete Study Notes
+## PART 1 of 3 — Topics 1 to 8
+
+---
+
+# 1. Digital Systems Basics
+
+## 1.1 What is a Digital System?
+
+A **digital system** processes, stores, or transmits information using **discrete** values instead of continuous ones. In electronics, this almost always means **two voltage levels**, representing binary digits (bits): `0` and `1`.
+
+Contrast with **analog systems**, where signals vary continuously (e.g., a microphone's voltage output tracking sound pressure smoothly).
+
+| Aspect | Analog | Digital |
+|---|---|---|
+| Signal values | Continuous (infinite range) | Discrete (usually 2 levels: 0, 1) |
+| Noise sensitivity | High — any noise changes the signal | Low — small noise doesn't flip a 0 to a 1 |
+| Storage | Difficult, degrades over time | Easy, exact (memory, registers) |
+| Processing | Needs analog circuits (op-amps, filters) | Needs logic gates, easy to design & scale |
+| Example | Old cassette tapes, analog radio | Computers, digital watches, CPUs |
+
+**Why digital wins in modern hardware:** noise immunity, exact reproducibility, easy storage, and the ability to use the same fabrication technology (CMOS) to build billions of identical, reliable switches (transistors) that implement logic.
+
+## 1.2 Why Two Voltage Levels?
+
+Real circuits use **voltage thresholds**, not exact values, to represent 0 and 1. For example, in a typical CMOS system with a 3.3V supply:
+
+- Logic **HIGH (1)**: voltage above a threshold, e.g., > 2.0V
+- Logic **LOW (0)**: voltage below a threshold, e.g., < 0.8V
+- The region in between (0.8V–2.0V) is the **forbidden/undefined zone** — a valid gate output should never sit there in steady state.
+
+This gap between the "guaranteed 1" and "guaranteed 0" zones is called **noise margin**. It's the single biggest reason digital circuits are reliable: small noise spikes riding on the signal don't change the interpreted logic value, because the receiver only needs to know "is it above or below a threshold," not "what is the exact voltage."
+
+**Common misconception:** Students often think 1 = exactly 5V (or 3.3V) and 0 = exactly 0V. In reality, a *range* of voltages maps to each logic level, and datasheets define these ranges (`V_IH`, `V_IL`, `V_OH`, `V_OL` — Input/Output High/Low voltage specs).
+
+## 1.3 Why Binary (Base 2) and Not Base 10 or Base 3?
+
+- Transistors are naturally **bistable switches** — easiest to build reliably as ON/OFF devices, not 10-state devices.
+- Binary logic maps perfectly onto **Boolean algebra**, giving a rigorous mathematical foundation for circuit design, simplification, and verification.
+- Two-state systems are maximally resistant to noise per unit of circuit complexity.
+
+## 1.4 Building Blocks Overview
+
+A digital system is built in layers, each abstracting the one below it:
+
+```
+Application software
+        |
+Instruction Set Architecture (ISA)
+        |
+Microarchitecture (pipeline, ALU, registers)
+        |
+RTL (Register Transfer Level) — Verilog/VHDL
+        |
+Gate-level logic (AND, OR, NOT, flip-flops)
+        |
+Transistor level (CMOS switches)
+        |
+Physical silicon (doped semiconductor)
+```
+
+This course (digital design) lives mainly at the **gate level** and **RTL level**, with awareness of what happens below (transistors) and above (architecture).
+
+## 1.5 Combinational vs Sequential Systems (Preview)
+
+This is the most fundamental classification in digital design, introduced early because everything else builds on it:
+
+| | Combinational | Sequential |
+|---|---|---|
+| Output depends on | Only current inputs | Current inputs + past history (state) |
+| Memory element | None | Yes (flip-flops/latches) |
+| Example | Adder, multiplexer, decoder | Counter, FSM, register |
+| Timing | Propagation delay only | Needs a clock (mostly) |
+
+We will explore both in depth later (Sections 7 and 13+).
+
+## 1.6 Positive vs Negative Logic
+
+- **Positive logic:** higher voltage = 1, lower voltage = 0 (the default assumption almost everywhere).
+- **Negative logic:** higher voltage = 0, lower voltage = 1 (rare, but exists in some bus protocols and older TTL families).
+
+**Common mistake:** Assuming a signal named `RESET` is active-high. Always check for an active-low naming convention, typically shown as `RESET_N`, `RESET#`, `nRESET`, or with a bar over the name (`R̄ESET`). Active-low signals trigger their function when driven to `0`.
+
+## 1.7 Why This Matters in Real Hardware
+
+- All modern CPUs, memories, FPGAs, and ASICs are digital systems built from the concepts in this document.
+- Signal integrity, noise margins, and logic levels directly determine **maximum clock speed**, **power consumption**, and **reliability** of a chip.
+- Every optimization an engineer does at the RTL or gate level is ultimately about respecting these physical realities (voltage margins, delay, capacitance).
+
+---
+
+# 2. Number Systems and Codes
+
+## 2.1 Why Number Systems Matter
+
+Digital hardware only understands binary at the physical level, but humans need decimal, and hardware designers need hexadecimal (compact binary) and octal historically. You must be fluent in converting between these because **all data — instructions, addresses, characters, images — is ultimately a binary number**.
+
+## 2.2 Positional Number Systems
+
+A number system is defined by its **base (radix) r**. Each digit position has a weight of `r^position`.
+
+General formula for a number with digits `d_n d_{n-1} ... d_1 d_0 . d_{-1} d_{-2}`:
+
+```
+Value = Σ (d_i × r^i)
+```
+
+| System | Base | Digits used |
+|---|---|---|
+| Binary | 2 | 0, 1 |
+| Octal | 8 | 0–7 |
+| Decimal | 10 | 0–9 |
+| Hexadecimal | 16 | 0–9, A–F |
+
+### Example: Binary to Decimal
+`1011.01₂`
+```
+= 1×2³ + 0×2² + 1×2¹ + 1×2⁰ + 0×2⁻¹ + 1×2⁻²
+= 8 + 0 + 2 + 1 + 0 + 0.25
+= 11.25₁₀
+```
+
+### Example: Decimal to Binary (Integer part) — Division Method
+Convert 45 to binary:
+```
+45 / 2 = 22 remainder 1   (LSB)
+22 / 2 = 11 remainder 0
+11 / 2 = 5  remainder 1
+5  / 2 = 2  remainder 1
+2  / 2 = 1  remainder 0
+1  / 2 = 0  remainder 1   (MSB)
+
+Reading remainders bottom-to-top: 101101₂
+```
+
+### Example: Decimal to Binary (Fractional part) — Multiplication Method
+Convert 0.625 to binary:
+```
+0.625 × 2 = 1.25 → bit 1
+0.25  × 2 = 0.50 → bit 0
+0.50  × 2 = 1.00 → bit 1  (stop, remainder is 0)
+
+0.625₁₀ = 0.101₂
+```
+
+**Common mistake:** Forgetting that fractional conversion can be *non-terminating* in binary even if it terminates in decimal (e.g., 0.1 decimal is a repeating binary fraction — this is why floating-point arithmetic has rounding errors in computers!).
+
+## 2.3 Binary ↔ Hexadecimal ↔ Octal (Fast Conversion)
+
+Because 16 = 2⁴ and 8 = 2³, you can convert directly by grouping bits — **no need to go through decimal**.
+
+- **Binary → Hex:** group bits in 4s from the binary point outward, pad with zeros as needed.
+- **Binary → Octal:** group bits in 3s.
+
+### Example
+Convert `10110111₂` to hex:
+```
+1011 0111
+ B    7
+= B7₁₆
+```
+
+Convert `10110111₂` to octal:
+```
+010 110 111   (pad to multiple of 3 from LSB)
+ 2   6   7
+= 267₈
+```
+
+This grouping trick is **why hex is used universally in digital design** — it's a compact, human-readable shorthand for binary that translates instantly, unlike decimal.
+
+## 2.4 Signed Number Representations
+
+Digital hardware must represent negative numbers using only bits — there's no "minus sign" wire by default.
+
+### 2.4.1 Sign-Magnitude
+- MSB = sign (0 = positive, 1 = negative), remaining bits = magnitude.
+- Problem: **two representations of zero** (+0 and −0), and arithmetic circuits become complicated (can't just add).
+
+### 2.4.2 1's Complement
+- Negative number = flip all bits of the positive number.
+- Problem: still has **two zeros** (`0000` and `1111`), and requires **end-around carry** correction during addition.
+
+### 2.4.3 2's Complement (Used in ALL modern hardware)
+- Negative number = invert all bits of positive number, then add 1.
+- **Only one representation of zero.**
+- Addition and subtraction use the **same adder hardware** — this is the single biggest reason it's universally adopted.
+
+**Finding 2's complement of 6 (in 8 bits):**
+```
+6         = 0000 0110
+Invert    = 1111 1001
+Add 1     = 1111 1010   → this is −6 in 8-bit 2's complement
+```
+
+**Range for n-bit 2's complement:** `−2^(n−1)` to `+2^(n−1) − 1`
+
+For 8 bits: −128 to +127 (note the asymmetry — one extra negative number, since zero "uses up" one positive slot).
+
+### Comparison Table
+
+| Representation | Zero(s) | Range (n=8) | Arithmetic HW complexity |
+|---|---|---|---|
+| Sign-Magnitude | +0, −0 | −127 to +127 | Complex (separate add/sub logic) |
+| 1's Complement | +0, −0 | −127 to +127 | Medium (end-around carry) |
+| 2's Complement | Only one 0 | −128 to +127 | Simple (reuse adder) |
+
+**Why it matters in hardware:** Every ALU (Arithmetic Logic Unit) in every CPU uses 2's complement internally for signed arithmetic — this is *the* reason subtraction is implemented as "add the 2's complement" rather than needing a separate subtractor circuit.
+
+## 2.5 Overflow Detection
+
+Overflow occurs in signed addition when the result's sign is wrong given the operand signs.
+
+**Rule:** Overflow happens if two numbers of the **same sign** are added and the result has the **opposite sign**.
+
+Hardware detection (common method): `Overflow = Carry_into_MSB XOR Carry_out_of_MSB`
+
+### Example (4-bit, range −8 to +7)
+```
+  0111  (+7)
++ 0001  (+1)
+--------
+  1000  (which reads as −8 in 2's complement!) → OVERFLOW
+```
+
+## 2.6 Binary Codes
+
+Codes assign bit patterns to represent information beyond plain binary numbers.
+
+### 2.6.1 BCD (Binary Coded Decimal)
+- Each decimal digit (0–9) is encoded in 4 bits separately.
+- Example: 45 in BCD = `0100 0101` (NOT `101101`, which is straight binary).
+- Used in: digital clocks, calculators, seven-segment displays — anywhere decimal display is needed directly.
+- **Wastes codes:** 4 bits can represent 0–15, but BCD only uses 0–9, so 6 combinations (1010–1111) are invalid/unused per digit.
+
+### 2.6.2 Gray Code
+- Successive values differ in **only one bit**.
+- Critical for **minimizing glitches** when a counter or sensor value transitions, because multiple bits changing at slightly different times can cause momentary invalid states.
+- Used in: rotary encoders, Karnaugh maps (which are literally arranged in Gray code order!), FIFO pointers crossing clock domains (see Section 18).
+
+| Decimal | Binary | Gray Code |
+|---|---|---|
+| 0 | 000 | 000 |
+| 1 | 001 | 001 |
+| 2 | 010 | 011 |
+| 3 | 011 | 010 |
+| 4 | 100 | 110 |
+| 5 | 101 | 111 |
+| 6 | 110 | 101 |
+| 7 | 111 | 100 |
+
+**Binary → Gray conversion:** `G = B XOR (B >> 1)` (MSB stays the same, then each subsequent bit = XOR of current and previous binary bit).
+
+### 2.6.3 Excess-3 Code
+- Add 3 to the decimal digit, then represent in binary (4 bits).
+- Self-complementing: 9's complement of a digit = bitwise complement of its Excess-3 code. Historically used to simplify BCD arithmetic circuits.
+
+### 2.6.4 ASCII
+- 7-bit (or 8-bit extended) code representing characters (letters, digits, symbols).
+- Example: `'A'` = `65` decimal = `0100 0001` binary.
+- Fundamental for any system handling text I/O (UARTs, keyboards, displays).
+
+### 2.6.5 Parity Bits (Error Detection)
+- **Even parity:** total number of 1s (data + parity bit) is even.
+- **Odd parity:** total number of 1s is odd.
+- Detects **single-bit errors** in transmission; cannot detect even numbers of bit errors, and cannot correct errors (only detect).
+- Used in: RAM (ECC-lite versions), serial communication (UART), simple memory buses.
+
+**Common beginner mistake:** Confusing Gray code with BCD — they solve completely different problems (transition-safety vs. decimal representation).
+
+## 2.7 Why This Matters in FPGA/ASIC/RTL Design
+
+- Bus widths, address decoding, and memory maps are all designed and debugged in hex.
+- 2's complement arithmetic is built into every Verilog `+`/`-` operator when operands are declared `signed`.
+- Gray code counters are a **must-know** technique for safely crossing clock domains (revisited in Section 18).
+- Parity/ECC bits appear in real memory controllers and communication protocol designs (UART, SPI, I2C frames).
+
+---
+
+# 3. Boolean Algebra
+
+## 3.1 What Is Boolean Algebra?
+
+Boolean algebra is a mathematical system (developed by George Boole, later applied to switching circuits by Claude Shannon) that deals with variables having only **two values**: `0` (False) and `1` (True). It is the **mathematical foundation of all digital logic design** — every gate, every circuit, every RTL expression reduces to Boolean algebra underneath.
+
+**Why it matters:** Boolean algebra lets us *prove* two circuits are functionally identical, *simplify* a circuit to use fewer gates (saving area, power, delay), and *reason formally* instead of guessing.
+
+## 3.2 Basic Operations
+
+| Operation | Symbol (this doc) | Also written as | Meaning |
+|---|---|---|---|
+| AND | `A · B` or `AB` | `A ∧ B` | 1 only if both A and B are 1 |
+| OR | `A + B` | `A ∨ B` | 1 if at least one of A, B is 1 |
+| NOT | `A'` or `Ā` | `¬A` | Inverts the value |
+
+## 3.3 Postulates and Basic Identities
+
+| Identity | AND form | OR form |
+|---|---|---|
+| Identity element | `A · 1 = A` | `A + 0 = A` |
+| Null element | `A · 0 = 0` | `A + 1 = 1` |
+| Idempotent | `A · A = A` | `A + A = A` |
+| Complement | `A · A' = 0` | `A + A' = 1` |
+| Double negation | `(A')' = A` | — |
+
+## 3.4 Fundamental Laws
+
+### 3.4.1 Commutative Law
+```
+A · B = B · A
+A + B = B + A
+```
+
+### 3.4.2 Associative Law
+```
+(A · B) · C = A · (B · C)
+(A + B) + C = A + (B + C)
+```
+
+### 3.4.3 Distributive Law
+```
+A · (B + C) = A·B + A·C
+A + (B · C) = (A+B) · (A+C)     ← this second form doesn't exist in normal algebra! Boolean algebra is special.
+```
+
+### 3.4.4 Absorption Law
+```
+A + A·B = A
+A · (A + B) = A
+A + A'·B = A + B
+```
+
+### 3.4.5 De Morgan's Theorems (Extremely important — used constantly)
+```
+(A + B)' = A' · B'      "NOR is equivalent to AND of complements"
+(A · B)' = A' + B'      "NAND is equivalent to OR of complements"
+```
+
+**Why De Morgan's matters practically:** It lets you convert between AND/OR/NOT-based designs and NAND/NOR-based designs — critical because **NAND and NOR gates are the most efficient to fabricate in CMOS** (fewer transistors, faster), so real chips are built predominantly from NAND/NOR, not raw AND/OR gates.
+
+### Worked Example: Simplify `F = A·B + A·B' + A'·B`
+```
+F = A·B + A·B' + A'·B
+  = A(B + B') + A'·B          [factor A from first two terms]
+  = A·1 + A'·B                [B + B' = 1]
+  = A + A'·B                  [absorption: A + A'B = A + B]
+  = A + B
+```
+Result: `F = A + B` (a 3-term expression collapses to a single OR gate!). This demonstrates *why* simplification matters — fewer gates, less delay, less power, smaller area.
+
+## 3.5 Duality Principle
+
+Every Boolean identity has a **dual**: swap AND↔OR and 0↔1, and the identity still holds. This is why the tables above are shown in pairs — you only need to memorize one column and can derive the other.
+
+## 3.6 Boolean Function Evaluation — Truth Tables
+
+Any Boolean expression can be fully described by a **truth table** listing every input combination and its output. For `n` variables, there are `2^n` rows.
+
+### Example: `F = A·B + C`
+
+| A | B | C | F |
+|---|---|---|---|
+| 0 | 0 | 0 | 0 |
+| 0 | 0 | 1 | 1 |
+| 0 | 1 | 0 | 0 |
+| 0 | 1 | 1 | 1 |
+| 1 | 0 | 0 | 0 |
+| 1 | 0 | 1 | 1 |
+| 1 | 1 | 0 | 1 |
+| 1 | 1 | 1 | 1 |
+
+## 3.7 Complement of a Function
+
+To find `F'`, apply De Morgan's repeatedly, or simply invert every value in the truth table's output column.
+
+### Example
+`F = A·B + C'`
+`F' = (A·B + C')' = (A·B)' · (C')' = (A' + B') · C`
+
+## 3.8 Algebraic Manipulation — Common Simplification Patterns
+
+| Pattern | Simplifies to |
+|---|---|
+| `A + A'B` | `A + B` |
+| `A(A + B)` | `A` |
+| `AB + AB'` | `A` |
+| `(A+B)(A+B')` | `A` |
+| `AB + A'C + BC` | `AB + A'C` (BC is redundant — **consensus theorem**) |
+
+### Consensus Theorem (frequently missed by students)
+```
+A·B + A'·C + B·C = A·B + A'·C
+```
+The term `B·C` is called the **consensus term** and is always redundant given the other two terms. This is important later for **hazard elimination** in Section 12 — sometimes you deliberately *add back* a consensus term to avoid a glitch, even though it's "redundant" logically.
+
+## 3.9 Common Beginner Mistakes in Boolean Algebra
+
+1. **Misapplying De Morgan's** — forgetting to flip the operator when distributing a complement: `(A+B)' ≠ A' + B'` (correct is `A'·B'`).
+2. **Assuming Boolean algebra behaves like real-number algebra** — e.g., there's no "subtraction" or "division"; `A + A = A`, not `2A`.
+3. **Forgetting operator precedence** — AND (`·`) binds tighter than OR (`+`), similar to multiplication before addition.
+4. **Sign errors when complementing multi-term expressions** — always complement term by term carefully, ideally via truth table cross-check for small expressions.
+
+## 3.10 Why This Matters in RTL/Hardware
+
+- Every logic synthesis tool internally represents your Verilog code as Boolean expressions, then applies algebraic simplification (technology-independent optimization) before mapping to actual gates from a **standard cell library**.
+- Manual Boolean simplification skill directly transfers to writing efficient combinational logic and to debugging why synthesized logic looks different from what you wrote.
+
+---
+
+# 4. Logic Gates
+
+## 4.1 What Is a Logic Gate?
+
+A logic gate is the physical (or symbolic) realization of a Boolean operation — a circuit with one or more binary inputs and one binary output, built (in modern hardware) from CMOS transistors.
+
+## 4.2 Basic Gates
+
+### AND Gate
+Output is 1 only if **all** inputs are 1.
+
+| A | B | Y |
+|---|---|---|
+| 0 | 0 | 0 |
+| 0 | 1 | 0 |
+| 1 | 0 | 0 |
+| 1 | 1 | 1 |
+
+Boolean: `Y = A · B`
+
+### OR Gate
+Output is 1 if **at least one** input is 1.
+
+| A | B | Y |
+|---|---|---|
+| 0 | 0 | 0 |
+| 0 | 1 | 1 |
+| 1 | 0 | 1 |
+| 1 | 1 | 1 |
+
+Boolean: `Y = A + B`
+
+### NOT Gate (Inverter)
+| A | Y |
+|---|---|
+| 0 | 1 |
+| 1 | 0 |
+
+Boolean: `Y = A'`
+
+## 4.3 Universal Gates
+
+### NAND Gate (AND + NOT)
+| A | B | Y |
+|---|---|---|
+| 0 | 0 | 1 |
+| 0 | 1 | 1 |
+| 1 | 0 | 1 |
+| 1 | 1 | 0 |
+
+Boolean: `Y = (A·B)'`
+
+### NOR Gate (OR + NOT)
+| A | B | Y |
+|---|---|---|
+| 0 | 0 | 1 |
+| 0 | 1 | 0 |
+| 1 | 0 | 0 |
+| 1 | 1 | 0 |
+
+Boolean: `Y = (A+B)'`
+
+**Why NAND and NOR are called "universal":** Either gate alone can implement AND, OR, and NOT — meaning **any** Boolean function can be built using only NAND gates, or only NOR gates.
+
+### Building basic gates from NAND only:
+```
+NOT A       = NAND(A, A)
+A AND B     = NAND( NAND(A,B), NAND(A,B) )     [invert the NAND output]
+A OR B      = NAND( NAND(A,A), NAND(B,B) )     [De Morgan's applied physically]
+```
+
+**Why this matters in real chips:** CMOS NAND and NOR gates are more efficient to fabricate than AND/OR (which internally are NAND/NOR + an extra inverter). Standard cell libraries are NAND/NOR-centric, and synthesis tools prefer mapping to these primitives.
+
+## 4.4 XOR and XNOR Gates
+
+### XOR (Exclusive OR)
+Output is 1 if inputs are **different**.
+
+| A | B | Y |
+|---|---|---|
+| 0 | 0 | 0 |
+| 0 | 1 | 1 |
+| 1 | 0 | 1 |
+| 1 | 1 | 0 |
+
+Boolean: `Y = A ⊕ B = A·B' + A'·B`
+
+### XNOR (Exclusive NOR)
+Output is 1 if inputs are **the same**.
+
+| A | B | Y |
+|---|---|---|
+| 0 | 0 | 1 |
+| 0 | 1 | 0 |
+| 1 | 0 | 0 |
+| 1 | 1 | 1 |
+
+Boolean: `Y = (A ⊕ B)' = A·B + A'·B'`
+
+**Practical use:** XOR is the core of adders (Section 9), parity generators/checkers, and comparators. XNOR is used in equality comparators.
+
+## 4.5 Gate Symbols Summary (Conceptual)
+
+```
+AND:    A ---\
+              )O--- Y      (flat back, curved front, no bubble)
+        B ---/
+
+OR:     A ---\
+              )>--- Y      (curved back, pointed front, no bubble)
+        B ---/
+
+NOT:    A ---|>o--- Y      (triangle + bubble)
+
+NAND:   AND symbol + bubble on output
+NOR:    OR symbol + bubble on output
+XOR:    OR symbol with extra curved line at input
+```
+
+(In text notes, always identify a gate by shape-type + presence/absence of an output bubble — the bubble means "invert.")
+
+## 4.6 Gate Propagation Delay (Preview)
+
+Every real gate has a **propagation delay** (`t_pd`) — the time between an input change and the corresponding output change, due to transistor switching speed and capacitive loading. This is covered in depth in Section 16, but it's introduced conceptually here: **no gate output changes instantaneously.**
+
+## 4.7 Fan-In and Fan-Out
+
+- **Fan-in:** number of inputs a gate accepts. Gates with high fan-in (e.g., 8-input AND) are slower and larger.
+- **Fan-out:** number of gate inputs a single gate's output can safely drive without violating electrical specs (current/voltage limits) or excessively slowing the signal (due to added capacitance).
+
+**Common mistake:** Assuming a gate output can drive unlimited downstream gates — in real hardware, exceeding fan-out limits causes voltage levels to degrade below noise margins, or dramatically slows switching speed.
+
+## 4.8 CMOS Realization (Conceptual Overview)
+
+- Each logic gate is built from **PMOS** (pull-up network, conducts when input is 0) and **NMOS** (pull-down network, conducts when input is 1) transistors.
+- A CMOS inverter: PMOS connects output to VDD when input=0; NMOS connects output to GND when input=1. Exactly one of the two networks conducts at a time (in steady state) — this is why CMOS gates consume very little **static power** (no direct path from VDD to GND normally).
+- **Dynamic power** (from switching) dominates CMOS power consumption: `P ≈ C × V² × f` — this formula is a cornerstone of chip power design (C = load capacitance, V = supply voltage, f = switching frequency).
+
+## 4.9 Gate-Level Verilog Modeling
+
+Verilog supports **gate-level primitives** directly:
+
+```verilog
+module basic_gates (
+    input  a, b,
+    output y_and, y_or, y_not, y_nand, y_nor, y_xor, y_xnor
+);
+    and  (y_and,  a, b);
+    or   (y_or,   a, b);
+    not  (y_not,  a);
+    nand (y_nand, a, b);
+    nor  (y_nor,  a, b);
+    xor  (y_xor,  a, b);
+    xnor (y_xnor, a, b);
+endmodule
+```
+
+More commonly in **RTL-style** (dataflow) Verilog, you use Boolean operators directly:
+
+```verilog
+module basic_gates_rtl (
+    input  a, b,
+    output y_and, y_or, y_not, y_nand, y_nor, y_xor, y_xnor
+);
+    assign y_and  = a & b;
+    assign y_or   = a | b;
+    assign y_not  = ~a;
+    assign y_nand = ~(a & b);
+    assign y_nor  = ~(a | b);
+    assign y_xor  = a ^ b;
+    assign y_xnor = ~(a ^ b);
+endmodule
+```
+
+**Design caveat:** Gate-level primitives (`and`, `or`, etc.) are rarely used in modern RTL except for teaching or very low-level structural modeling — real designs use `assign` statements or `always` blocks, which synthesis tools map to gates automatically.
+
+## 4.10 Common Beginner Mistakes with Gates
+
+1. **Confusing bitwise (`&`, `|`, `^`) with logical (`&&`, `||`) operators in Verilog** — bitwise operates per-bit on vectors, logical reduces to a single 1-bit true/false. Using the wrong one on multi-bit signals silently produces wrong results.
+2. **Forgetting NAND/NOR are NOT associative** in the way AND/OR are: `NAND(NAND(A,B),C) ≠ NAND(A,NAND(B,C))` in general — always verify with a truth table before cascading.
+3. **Ignoring loading effects** — treating gates as ideal with zero delay and infinite fan-out during early design, then being surprised by timing failures later.
+
+## 4.11 Where Used in Real Design
+
+- **FPGA:** Look-Up Tables (LUTs) implement arbitrary small Boolean functions (typically 4–6 input) — internally this is a truth table stored in memory, not discrete gates, but the *logical* behavior is identical to a network of gates.
+- **ASIC:** Standard cell libraries provide pre-characterized NAND, NOR, AOI (AND-OR-Invert), OAI gates that synthesis tools pick from to implement your RTL.
+- **RTL:** All combinational `assign`/`always @(*)` logic reduces to networks of these gates after synthesis.
+
+---
+
+# 5. Canonical Forms and Standard Forms
+
+## 5.1 Why Canonical Forms Exist
+
+A given Boolean function can be written in many equivalent ways. **Canonical forms** give a *unique*, systematic representation directly derived from the truth table — useful for consistent circuit derivation, comparison, and as the starting point before simplification (e.g., via K-maps, Section 6).
+
+## 5.2 Minterms and Maxterms
+
+For `n` variables, there are `2^n` possible input combinations. Each combination corresponds to one **minterm** (for SOP) and one **maxterm** (for POS).
+
+### Minterm
+A product (AND) term that is 1 for **exactly one** row of the truth table. Variable is uncomplemented if it's 1 in that row, complemented if it's 0.
+
+### Maxterm
+A sum (OR) term that is 0 for **exactly one** row of the truth table. Variable is complemented if it's 1 in that row, uncomplemented if it's 0 (opposite convention from minterms).
+
+### Example (3 variables: A, B, C)
+
+| A | B | C | Minterm | Maxterm |
+|---|---|---|---|---|
+| 0 | 0 | 0 | `m0 = A'B'C'` | `M0 = A+B+C` |
+| 0 | 0 | 1 | `m1 = A'B'C` | `M1 = A+B+C'` |
+| 0 | 1 | 0 | `m2 = A'BC'` | `M2 = A+B'+C` |
+| 0 | 1 | 1 | `m3 = A'BC` | `M3 = A+B'+C'` |
+| 1 | 0 | 0 | `m4 = AB'C'` | `M4 = A'+B+C` |
+| 1 | 0 | 1 | `m5 = AB'C` | `M5 = A'+B+C'` |
+| 1 | 1 | 0 | `m6 = ABC'` | `M6 = A'+B'+C` |
+| 1 | 1 | 1 | `m7 = ABC` | `M7 = A'+B'+C'` |
+
+**Key relationship:** `mᵢ = Mᵢ'` — every minterm is the complement of the corresponding maxterm.
+
+## 5.3 Sum of Products (SOP) — Canonical Form
+
+Express `F` as the **OR (sum) of minterms** where `F = 1`.
+
+### Example
+Given the truth table:
+
+| A | B | C | F |
+|---|---|---|---|
+| 0 | 0 | 0 | 0 |
+| 0 | 0 | 1 | 1 |
+| 0 | 1 | 0 | 0 |
+| 0 | 1 | 1 | 1 |
+| 1 | 0 | 0 | 0 |
+| 1 | 0 | 1 | 0 |
+| 1 | 1 | 0 | 1 |
+| 1 | 1 | 1 | 1 |
+
+`F` is 1 at rows 1, 3, 6, 7 → `F = Σm(1, 3, 6, 7)`
+
+Canonical SOP:
+```
+F = A'B'C + A'BC + ABC' + ABC
+```
+
+## 5.4 Product of Sums (POS) — Canonical Form
+
+Express `F` as the **AND (product) of maxterms** where `F = 0`.
+
+Using the same table, `F = 0` at rows 0, 2, 4, 5 → `F = ΠM(0, 2, 4, 5)`
+
+Canonical POS:
+```
+F = (A+B+C) · (A+B'+C) · (A'+B+C) · (A'+B+C')
+```
+
+**Verification check:** minterm indices + maxterm indices together must cover all `2^n` combinations exactly once. Here: {1,3,6,7} ∪ {0,2,4,5} = {0..7} ✓.
+
+## 5.5 Converting Between SOP and POS
+
+- `Σm(list)` and `ΠM(complement of list)` represent the **same function**.
+- Example: `F = Σm(1,3,6,7)` is identical to `F = ΠM(0,2,4,5)` — same truth table, two different canonical descriptions.
+
+## 5.6 Canonical vs Standard (Minimal) Forms
+
+| | Canonical SOP/POS | Standard (minimized) SOP/POS |
+|---|---|---|
+| Every term includes | All variables (full minterm/maxterm) | Only necessary variables |
+| Uniqueness | Unique for a given function | Multiple minimal forms may exist |
+| Gate count | Often high (more literals) | Lower (goal of minimization) |
+| Use case | Starting point, formal proofs | Actual circuit implementation |
+
+### Example of standard (non-canonical, minimized) SOP
+From `F = A'B'C + A'BC + ABC' + ABC` (canonical), after simplification (see Section 6 for the systematic method):
+```
+F = A'C + AB
+```
+This uses far fewer literals and gates — this is *why* we don't build circuits directly from canonical forms in practice, but they're the essential starting point for systematic minimization.
+
+## 5.7 Two-Level vs Multi-Level Logic
+
+- **Two-level logic:** SOP (AND gates → OR gate) or POS (OR gates → AND gate) — exactly two gate delays from input to output. Fast, but can require many gates/wide gates for complex functions.
+- **Multi-level logic:** factored, nested expressions (e.g., using Boolean factoring, sharing sub-expressions) — fewer total gates/transistors, but more levels of delay.
+
+**Trade-off in real design:** Two-level logic minimizes delay (good for speed-critical paths); multi-level minimizes area/power (good for non-critical logic). Synthesis tools automatically decide this via **timing constraints** you provide.
+
+## 5.8 Verilog Representation of SOP/POS
+
+```verilog
+module sop_example (
+    input  a, b, c,
+    output f
+);
+    // Canonical SOP: F = Σm(1,3,6,7)
+    assign f = (~a & ~b & c) | (~a & b & c) | (a & b & ~c) | (a & b & c);
+endmodule
+```
+
+Minimized version (functionally identical, fewer gates):
+```verilog
+module sop_minimized (
+    input  a, b, c,
+    output f
+);
+    assign f = (~a & c) | (a & b);   // F = A'C + AB
+endmodule
+```
+
+Both modules are **functionally equivalent** (same truth table) — synthesis tools would ideally simplify the first to something like the second automatically, but writing minimized logic yourself is still good practice for clarity and simulation speed.
+
+## 5.9 Common Beginner Mistakes
+
+1. **Mixing up minterm and maxterm complementation conventions** — minterms use uncomplemented for 1, maxterms use complemented for 1. Easy to swap by mistake.
+2. **Forgetting the `Σ`/`Π` index lists must partition the full index range** — every index from 0 to `2ⁿ−1` appears in exactly one of the two lists (minterm list or maxterm list, don't-cares aside — see Section 6).
+3. **Writing "canonical" forms that aren't actually canonical** — e.g., omitting a variable in a term when it should be a full minterm (that's a standard/minimized term, not canonical).
+
+## 5.10 Why This Matters in FPGA/RTL
+
+- FPGA LUTs are literally hardware truth tables — canonical SOP/POS thinking maps directly onto "what value does this LUT output for each input combination."
+- Many EDA/logic synthesis and verification tools internally use canonical representations (like **BDDs** — Binary Decision Diagrams, an advanced canonical form) to check if two circuits are logically equivalent — this underlies **formal equivalence checking** used in ASIC verification flows.
+
+---
+
+*(End of Part 1 — Topics 1 to 5: Digital Systems Basics, Number Systems and Codes, Boolean Algebra, Logic Gates, Canonical and Standard Forms. Part 2 will cover Topics 6–13 (Karnaugh Maps, Combinational Circuits, MUX/DEMUX/Encoder/Decoder, Comparators/Adders/Subtractors, Arithmetic Circuits & ALU, Tri-state Logic & Buses, Hazards & Glitches, Latches & Flip-Flops). Part 3 will cover Topics 14–25. Reply "continue" or "part 2" to proceed.)*
